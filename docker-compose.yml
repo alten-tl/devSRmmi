@@ -1,0 +1,31 @@
+networks:
+  sam-appointments-net:
+    driver: bridge
+    name: sam-appointments-net
+
+services:
+  appointments-db:
+    image: postgres:16-alpine
+    container_name: appointments-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-app_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-app_password}
+      POSTGRES_DB: ${DB_NAME:-appointments_db}
+    ports:
+      # Port published on the host (configurable in case 5432 is already in use).
+      - "${HOST_DB_PORT:-5434}:5432"
+    volumes:
+      - appointments_pg_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    networks:
+      - sam-appointments-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-app_user} -d ${DB_NAME:-appointments_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  appointments_pg_data:
