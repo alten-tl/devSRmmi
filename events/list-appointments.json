@@ -1,0 +1,19 @@
+{
+  "resource": "/appointments",
+  "path": "/appointments",
+  "httpMethod": "GET",
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "pathParameters": null,
+  "queryStringParameters": {
+    "date": "2026-10-20"
+  },
+  "body": null,
+  "isBase64Encoded": false,
+  "requestContext": {
+    "requestId": "local-list-001",
+    "resourcePath": "/appointments",
+    "httpMethod": "GET"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "resource": "/appointments/{id}/cancel",
+  "path": "/appointments/55555555-5555-4555-8555-555555555555/cancel",
+  "httpMethod": "PATCH",
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "pathParameters": {
+    "id": "55555555-5555-4555-8555-555555555555"
+  },
+  "queryStringParameters": null,
+  "body": null,
+  "isBase64Encoded": false,
+  "requestContext": {
+    "requestId": "local-cancel-001",
+    "resourcePath": "/appointments/{id}/cancel",
+    "httpMethod": "PATCH"
+  }
+}

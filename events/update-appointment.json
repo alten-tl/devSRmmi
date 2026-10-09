@@ -1,0 +1,19 @@
+{
+  "resource": "/appointments/{id}",
+  "path": "/appointments/55555555-5555-4555-8555-555555555555",
+  "httpMethod": "PUT",
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "pathParameters": {
+    "id": "55555555-5555-4555-8555-555555555555"
+  },
+  "queryStringParameters": null,
+  "body": "{\"date\":\"2026-10-21\",\"time\":\"11:30\",\"comments\":\"Reagendada por taller\"}",
+  "isBase64Encoded": false,
+  "requestContext": {
+    "requestId": "local-update-001",
+    "resourcePath": "/appointments/{id}",
+    "httpMethod": "PUT"
+  }
+}
