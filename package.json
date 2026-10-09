@@ -1,0 +1,49 @@
+{
+  "name": "sam-appointments-crud-ts",
+  "version": "1.0.0",
+  "description": "Appointments CRUD (clients, vehicles and appointments) with SAM, Node 20, TypeScript and hexagonal architecture.",
+  "main": "src/handlers/appointmentsHandler.ts",
+  "scripts": {
+    "build": "npm run build:clients && npm run build:vehicles && npm run build:appointments && npm run build:health",
+    "build:clients": "esbuild src/handlers/clientsHandler.ts --bundle --minify --sourcemap --platform=node --target=node20 --outfile=dist/handlers/clientsHandler.js",
+    "build:vehicles": "esbuild src/handlers/vehiclesHandler.ts --bundle --minify --sourcemap --platform=node --target=node20 --outfile=dist/handlers/vehiclesHandler.js",
+    "build:appointments": "esbuild src/handlers/appointmentsHandler.ts --bundle --minify --sourcemap --platform=node --target=node20 --outfile=dist/handlers/appointmentsHandler.js",
+    "build:health": "esbuild src/handlers/healthHandler.ts --bundle --minify --sourcemap --platform=node --target=node20 --outfile=dist/handlers/healthHandler.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "dev": "sam local start-api --docker-network sam-appointments-net",
+    "invoke:list": "sam local invoke AppointmentsFunction --event events/list-appointments.json --docker-network sam-appointments-net",
+    "invoke:create": "sam local invoke AppointmentsFunction --event events/create-appointment.json --docker-network sam-appointments-net",
+    "invoke:cancel": "sam local invoke AppointmentsFunction --event events/cancel-appointment.json --docker-network sam-appointments-net",
+    "validate": "sam validate",
+    "deploy": "sam build && sam deploy --guided",
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down",
+    "db:reset": "docker compose down -v && docker compose up -d",
+    "db:logs": "docker compose logs -f appointments-db"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@aws-sdk/client-secrets-manager": "^3.700.0",
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
+    "dotenv": "^16.4.7",
+    "pg": "^8.13.1",
+    "pino": "^9.5.0"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.146",
+    "@types/node": "^22.10.2",
+    "@types/pg": "^8.11.10",
+    "@vitest/coverage-v8": "^2.1.8",
+    "esbuild": "^0.24.2",
+    "pino-pretty": "^13.0.0",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

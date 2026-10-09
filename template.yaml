@@ -1,0 +1,328 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Appointments CRUD (clients, vehicles, appointments) - Node 20 + TypeScript + SAM.
+  Hexagonal architecture per aggregate: one Lambda per bounded context,
+  no monolith. Includes AJV validation, anti-SQL-injection WAF, Secrets Manager.
+
+Parameters:
+  Stage:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, staging, prod]
+  LogLevel:
+    Type: String
+    Default: info
+    AllowedValues: [fatal, error, warn, info, debug, trace]
+  DbHost:
+    Type: String
+    Default: appointments-db
+    Description: RDS host (prod) or Docker container host (local)
+  DbPort:
+    Type: Number
+    Default: 5432
+  DbName:
+    Type: String
+    Default: appointments_db
+  DbSecretArn:
+    Type: String
+    Default: ''
+    Description: Secrets Manager ARN holding DB_USER / DB_PASSWORD. Empty in local.
+
+Conditions:
+  HasDbSecret: !Not [!Equals [!Ref DbSecretArn, '']]
+
+Globals:
+  Function:
+    Runtime: nodejs20.x
+    Architectures: [arm64]
+    MemorySize: 512
+    Timeout: 15
+    Tracing: Active
+    Environment:
+      Variables:
+        NODE_OPTIONS: '--enable-source-maps'
+        LOG_LEVEL: !Ref LogLevel
+        STAGE: !Ref Stage
+
+Resources:
+  # ============================================================
+  # Lambda: clients
+  # ============================================================
+  ClientsFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: makefile
+    Properties:
+      CodeUri: ./
+      Handler: handlers/clientsHandler.handler
+      Description: Clients CRUD
+      AutoPublishAlias: !Ref Stage
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - AWSXrayWriteOnlyAccess
+        - Statement:
+            - Effect: Allow
+              Action: secretsmanager:GetSecretValue
+              Resource: !If
+                - HasDbSecret
+                - !Ref DbSecretArn
+                - !Sub 'arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret/unused-local-only'
+      Environment:
+        Variables:
+          DB_HOST: !Ref DbHost
+          DB_PORT: !Ref DbPort
+          DB_NAME: !Ref DbName
+          DB_SECRET_ARN: !Ref DbSecretArn
+          IS_LOCAL: 'false'
+      Events:
+        CreateClient:
+          Type: Api
+          Properties:
+            RestApiId: !Ref AppointmentsApi
+            Path: /clients
+            Method: POST
+        GetClient:
+          Type: Api
+          Properties:
+            RestApiId: !Ref AppointmentsApi
+            Path: /clients/{id}
+            Method: GET
+
+  # ============================================================
+  # Lambda: vehicles
+  # ============================================================
+  VehiclesFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: makefile
+    Properties:
+      CodeUri: ./
+      Handler: handlers/vehiclesHandler.handler
+      Description: Vehicles CRUD
+      AutoPublishAlias: !Ref Stage
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - AWSXrayWriteOnlyAccess
+        - Statement:
+            - Effect: Allow
+              Action: secretsmanager:GetSecretValue
+              Resource: !If
+                - HasDbSecret
+                - !Ref DbSecretArn
+                - !Sub 'arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret/unused-local-only'
+      Environment:
+        Variables:
+          DB_HOST: !Ref DbHost
+          DB_PORT: !Ref DbPort
+          DB_NAME: !Ref DbName
+          DB_SECRET_ARN: !Ref DbSecretArn
+          IS_LOCAL: 'false'
+      Events:
+        CreateVehicle:
+          Type: Api
+          Properties:
+            RestApiId: !Ref AppointmentsApi
+            Path: /vehicles
+            Method: POST
+        GetVehicle:
+          Type: Api
+          Properties:
+            RestApiId: !Ref AppointmentsApi
+            Path: /vehicles/{id}
+            Method: GET
+        ListVehiclesByClient:
+          Type: Api
+          Properties:
+            RestApiId: !Ref AppointmentsApi
+            Path: /clients/{id}/vehicles
+            Method: GET
+
+  # ============================================================
+  # Lambda: appointments (4 required use cases)
+  # ============================================================
+  AppointmentsFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: makefile
+    Properties:
+      CodeUri: ./
+      Handler: handlers/appointmentsHandler.handler
+      Description: 'Appointments: list by date, create, reschedule and cancel'
+      AutoPublishAlias: !Ref Stage
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - AWSXrayWriteOnlyAccess
+        - Statement:
+            - Effect: Allow
+              Action: secretsmanager:GetSecretValue
+              Resource: !If
+                - HasDbSecret
+                - !Ref DbSecretArn
+                - !Sub 'arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret/unused-local-only'
+      Environment:
+        Variables:
+          DB_HOST: !Ref DbHost
+          DB_PORT: !Ref DbPort
+          DB_NAME: !Ref DbName
+          DB_SECRET_ARN: !Ref DbSecretArn
+          IS_LOCAL: 'false'
+      Events:
+        ListAppointmentsByDate:
+          Type: Api
+          Properties:
+            RestApiId: !Ref AppointmentsApi
+            Path: /appointments
+            Method: GET
+        CreateAppointment:
+          Type: Api
+          Properties:
+            RestApiId: !Ref AppointmentsApi
+            Path: /appointments
+            Method: POST
+        UpdateAppointment:
+          Type: Api
+          Properties:
+            RestApiId: !Ref AppointmentsApi
+            Path: /appointments/{id}
+            Method: PUT
+        CancelAppointment:
+          Type: Api
+          Properties:
+            RestApiId: !Ref AppointmentsApi
+            Path: /appointments/{id}/cancel
+            Method: PATCH
+
+  # ============================================================
+  # Lambda: health check
+  # ============================================================
+  HealthFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: makefile
+    Properties:
+      CodeUri: ./
+      Handler: handlers/healthHandler.handler
+      Description: Database health check
+      AutoPublishAlias: !Ref Stage
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - AWSXrayWriteOnlyAccess
+        - Statement:
+            - Effect: Allow
+              Action: secretsmanager:GetSecretValue
+              Resource: !If
+                - HasDbSecret
+                - !Ref DbSecretArn
+                - !Sub 'arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret/unused-local-only'
+      Environment:
+        Variables:
+          DB_HOST: !Ref DbHost
+          DB_PORT: !Ref DbPort
+          DB_NAME: !Ref DbName
+          DB_SECRET_ARN: !Ref DbSecretArn
+          IS_LOCAL: 'false'
+      Events:
+        Health:
+          Type: Api
+          Properties:
+            RestApiId: !Ref AppointmentsApi
+            Path: /health
+            Method: GET
+
+  # ============================================================
+  # API Gateway: single endpoint with throttling and logging
+  # ============================================================
+  AppointmentsApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: !Ref Stage
+      TracingEnabled: true
+      MethodSettings:
+        - ResourcePath: '/*'
+          HttpMethod: '*'
+          ThrottlingBurstLimit: 100
+          ThrottlingRateLimit: 50
+          MetricsEnabled: true
+          DataTraceEnabled: false
+      AccessLogSetting:
+        DestinationArn: !GetAtt ApiLogsGroup.Arn
+        Format: '{"requestId":"$context.requestId","ip":"$context.identity.sourceIp","method":"$context.httpMethod","path":"$context.path","status":$context.status,"latency":$context.responseLatency}'
+      EndpointConfiguration:
+        Type: REGIONAL
+
+  ApiLogsGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/apigateway/appointments-crud-${Stage}'
+      RetentionInDays: 14
+
+  # ============================================================
+  # WAF: protection against SQL injection, XSS and malicious traffic
+  # ============================================================
+  AppointmentsWebAcl:
+    Type: AWS::WAFv2::WebACL
+    Properties:
+      Name: !Sub 'appointments-crud-webacl-${Stage}'
+      Scope: REGIONAL
+      Description: Blocks SQL injection, XSS and known bad inputs
+      DefaultAction:
+        Allow: {}
+      VisibilityConfig:
+        SampledRequestsEnabled: true
+        CloudWatchMetricsEnabled: true
+        MetricName: !Sub 'appointments-crud-webacl-${Stage}'
+      Rules:
+        - Name: AWSManagedRulesCommonRuleSet
+          Priority: 10
+          OverrideAction:
+            None: {}
+          Statement:
+            ManagedRuleGroupStatement:
+              VendorName: AWS
+              Name: AWSManagedRulesCommonRuleSet
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: !Sub 'common-${Stage}'
+        - Name: AWSManagedRulesSQLiRuleSet
+          Priority: 20
+          OverrideAction:
+            None: {}
+          Statement:
+            ManagedRuleGroupStatement:
+              VendorName: AWS
+              Name: AWSManagedRulesSQLiRuleSet
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: !Sub 'sqli-${Stage}'
+        - Name: AWSManagedRulesKnownBadInputsRuleSet
+          Priority: 30
+          OverrideAction:
+            None: {}
+          Statement:
+            ManagedRuleGroupStatement:
+              VendorName: AWS
+              Name: AWSManagedRulesKnownBadInputsRuleSet
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: !Sub 'bad-inputs-${Stage}'
+
+  AppointmentsWebAclAssociation:
+    Type: AWS::WAFv2::WebACLAssociation
+    Properties:
+      ResourceArn: !Sub 'arn:${AWS::Partition}:apigateway:${AWS::Region}::/restapis/${AppointmentsApi}/stages/${Stage}'
+      WebACLArn: !GetAtt AppointmentsWebAcl.Arn
+
+Outputs:
+  ApiUrl:
+    Description: API base URL
+    Value: !Sub 'https://${AppointmentsApi}.execute-api.${AWS::Region}.amazonaws.com/${Stage}'
+  ClientsFunctionArn:
+    Value: !GetAtt ClientsFunction.Arn
+  VehiclesFunctionArn:
+    Value: !GetAtt VehiclesFunction.Arn
+  AppointmentsFunctionArn:
+    Value: !GetAtt AppointmentsFunction.Arn
