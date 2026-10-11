@@ -1,0 +1,17 @@
+{
+  "resource": "/health",
+  "path": "/health",
+  "httpMethod": "GET",
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "pathParameters": null,
+  "queryStringParameters": null,
+  "body": null,
+  "isBase64Encoded": false,
+  "requestContext": {
+    "requestId": "local-health-001",
+    "resourcePath": "/health",
+    "httpMethod": "GET"
+  }
+}
